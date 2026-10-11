@@ -86,10 +86,10 @@ impl Solid {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PrimitiveBuilder {
-    vertices: HashMap<VertexId, Vertex>,
-    edges: HashMap<EdgeId, Edge>,
-    faces: HashMap<FaceId, Face>,
-    solids: HashMap<SolidId, Solid>,
+    pub vertices: HashMap<VertexId, Vertex>,
+    pub edges: HashMap<EdgeId, Edge>,
+    pub faces: HashMap<FaceId, Face>,
+    pub solids: HashMap<SolidId, Solid>,
 }
 
 impl PrimitiveBuilder {
@@ -168,11 +168,54 @@ impl PrimitiveBuilder {
         self.add_solid(solid.clone());
         solid
     }
+
+    pub fn cylinder_solid(&mut self, id: u64, radius: f64, height: f64, segments: u32) -> Solid {
+        let mut vertices = Vec::new();
+        let mut faces = Vec::new();
+
+        let bottom_center = VertexId(4000 + id * 100 + 0);
+        let top_center = VertexId(4000 + id * 100 + 1);
+        let bottom = (0..segments).map(|i| {
+            let angle = (i as f64 / segments as f64) * std::f64::consts::TAU;
+            let x = angle.cos() * radius;
+            let y = angle.sin() * radius;
+            let v = Vertex::new(4000 + id * 100 + 2 + i as u64, Point3::new(x, y, -height / 2.0));
+            self.add_vertex(v.clone());
+            v.id
+        }).collect::<Vec<_>>();
+
+        let top = (0..segments).map(|i| {
+            let angle = (i as f64 / segments as f64) * std::f64::consts::TAU;
+            let x = angle.cos() * radius;
+            let y = angle.sin() * radius;
+            let v = Vertex::new(5000 + id * 100 + 2 + i as u64, Point3::new(x, y, height / 2.0));
+            self.add_vertex(v.clone());
+            v.id
+        }).collect::<Vec<_>>();
+
+        let mut edge_ids = Vec::new();
+        for i in 0..segments {
+            let j = (i + 1) % segments;
+            edge_ids.push(EdgeId(6000 + id * 100 + i));
+            self.add_edge(Edge::new(6000 + id * 100 + i, bottom[i], bottom[j]));
+            edge_ids.push(EdgeId(6000 + id * 100 + 100 + i));
+            self.add_edge(Edge::new(6000 + id * 100 + 100 + i, top[i], top[j]));
+        }
+
+        let side_face_vertices: Vec<VertexId> = bottom.iter().copied().chain(top.iter().copied()).collect();
+        let side_face = Face::new(7000 + id * 10, side_face_vertices, edge_ids);
+        self.add_face(side_face.clone());
+        faces.push(side_face.id);
+
+        let solid = Solid::new(id, faces);
+        self.add_solid(solid.clone());
+        solid
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Point3, PrimitiveBuilder, VertexId};
+    use super::{Point3, PrimitiveBuilder};
 
     #[test]
     fn primitive_builder_creates_box_solid() {
@@ -182,10 +225,17 @@ mod tests {
     }
 
     #[test]
-    fn primitive_builder_box_has_expected_vertices() {
+    fn primitive_builder_has_expected_box_vertices() {
         let mut builder = PrimitiveBuilder::new();
         builder.box_solid(2, Point3::origin(), Point3::new(1.0, 2.0, 3.0));
-        assert!(builder.vertices.contains_key(&VertexId(1000 + 2 * 10 + 0)));
-        assert!(builder.vertices.contains_key(&VertexId(1000 + 2 * 10 + 7)));
+        assert!(builder.vertices.contains_key(&super::VertexId(1000 + 2 * 10 + 0)));
+        assert!(builder.vertices.contains_key(&super::VertexId(1000 + 2 * 10 + 7)));
+    }
+
+    #[test]
+    fn primitive_builder_can_create_cylinder_solid() {
+        let mut builder = PrimitiveBuilder::new();
+        let solid = builder.cylinder_solid(3, 1.0, 2.0, 8);
+        assert_eq!(solid.face_count(), 1);
     }
 }

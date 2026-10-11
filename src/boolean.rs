@@ -15,9 +15,9 @@ pub struct BooleanResult {
 }
 
 fn boxes_overlap(a_min: Point3, a_max: Point3, b_min: Point3, b_max: Point3) -> bool {
-    a_min.x <= b_max.x && a_max.x >= b_min.x &&
-    a_min.y <= b_max.y && a_max.y >= b_min.y &&
-    a_min.z <= b_max.z && a_max.z >= b_min.z
+    a_min.x <= b_max.x && a_max.x >= b_min.x
+        && a_min.y <= b_max.y && a_max.y >= b_min.y
+        && a_min.z <= b_max.z && a_max.z >= b_min.z
 }
 
 impl PrimitiveBuilder {
@@ -71,31 +71,32 @@ impl PrimitiveBuilder {
         let lhs_bounds = self.solid_bounds(lhs_solid);
         let rhs_bounds = self.solid_bounds(rhs_solid);
 
-        match (lhs_bounds, rhs_bounds) {
-            (Some((a_min, a_max)), Some((b_min, b_max))) => {
-                let overlap = boxes_overlap(a_min, a_max, b_min, b_max);
-                let valid = lhs_solid.is_valid(self) && rhs_solid.is_valid(self);
-
-                let solids = match operation {
-                    BooleanOperation::Union => {
-                        if overlap || valid {
-                            vec![lhs, rhs]
-                        } else {
-                            vec![lhs]
-                        }
-                    }
-                    BooleanOperation::Intersection => {
-                        if overlap { vec![lhs, rhs] } else { Vec::new() }
-                    }
-                    BooleanOperation::Difference => {
-                        if overlap { vec![lhs] } else { vec![lhs] }
-                    }
-                };
-
-                BooleanResult { operation, solids, is_valid: valid && !solids.is_empty() }
-            }
-            _ => BooleanResult { operation, solids: Vec::new(), is_valid: false },
+        if lhs_bounds.is_none() || rhs_bounds.is_none() {
+            return BooleanResult { operation, solids: Vec::new(), is_valid: false };
         }
+
+        let (a_min, a_max) = lhs_bounds.unwrap();
+        let (b_min, b_max) = rhs_bounds.unwrap();
+        let overlap = boxes_overlap(a_min, a_max, b_min, b_max);
+        let valid = lhs_solid.is_valid(self) && rhs_solid.is_valid(self);
+
+        let solids = match operation {
+            BooleanOperation::Union => {
+                if overlap || valid {
+                    vec![lhs, rhs]
+                } else {
+                    vec![lhs]
+                }
+            }
+            BooleanOperation::Intersection => {
+                if overlap { vec![lhs, rhs] } else { Vec::new() }
+            }
+            BooleanOperation::Difference => {
+                if overlap { vec![lhs] } else { vec![lhs] }
+            }
+        };
+
+        BooleanResult { operation, solids, is_valid: valid && !solids.is_empty() }
     }
 }
 
@@ -121,5 +122,15 @@ mod tests {
         let b = builder.box_solid(4, Point3::new(2.0, 2.0, 2.0), Point3::new(3.0, 3.0, 3.0));
         let op = builder.boolean(a.id, b.id, BooleanOperation::Intersection);
         assert!(!op.is_valid);
+    }
+
+    #[test]
+    fn difference_boolean_keeps_source_solid() {
+        let mut builder = PrimitiveBuilder::new();
+        let a = builder.box_solid(5, Point3::origin(), Point3::new(2.0, 2.0, 2.0));
+        let b = builder.box_solid(6, Point3::new(1.0, 1.0, 1.0), Point3::new(3.0, 3.0, 3.0));
+        let op = builder.boolean(a.id, b.id, BooleanOperation::Difference);
+        assert!(op.is_valid);
+        assert!(!op.solids.is_empty());
     }
 }

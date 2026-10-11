@@ -1,4 +1,4 @@
-use std::ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Point3 {
@@ -19,6 +19,10 @@ impl Point3 {
     pub fn distance_to(self, other: Self) -> f64 {
         (self - other).length()
     }
+
+    pub fn as_vector(self) -> Vector3 {
+        Vector3::new(self.x, self.y, self.z)
+    }
 }
 
 impl Add<Vector3> for Point3 {
@@ -26,6 +30,14 @@ impl Add<Vector3> for Point3 {
 
     fn add(self, rhs: Vector3) -> Self::Output {
         Point3::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
+    }
+}
+
+impl AddAssign<Vector3> for Point3 {
+    fn add_assign(&mut self, rhs: Vector3) {
+        self.x += rhs.x;
+        self.y += rhs.y;
+        self.z += rhs.z;
     }
 }
 
@@ -77,13 +89,23 @@ impl Vector3 {
         self.dot(self).sqrt()
     }
 
+    pub fn squared_length(self) -> f64 {
+        self.dot(self)
+    }
+
     pub fn normalized(self) -> Self {
         let len = self.length();
-        if len == 0.0 {
+        if len.is_zero() {
             Self::zero()
         } else {
-            Self::new(self.x / len, self.y / len, self.z / len)
+            self / len
         }
+    }
+
+    pub fn is_zero(self) -> bool {
+        self.x.abs() <= f64::EPSILON
+            && self.y.abs() <= f64::EPSILON
+            && self.z.abs() <= f64::EPSILON
     }
 }
 
@@ -127,6 +149,14 @@ impl Mul<f64> for Vector3 {
     }
 }
 
+impl MulAssign<f64> for Vector3 {
+    fn mul_assign(&mut self, rhs: f64) {
+        self.x *= rhs;
+        self.y *= rhs;
+        self.z *= rhs;
+    }
+}
+
 impl Mul<Vector3> for f64 {
     type Output = Vector3;
 
@@ -139,7 +169,21 @@ impl Div<f64> for Vector3 {
     type Output = Vector3;
 
     fn div(self, rhs: f64) -> Self::Output {
-        Vector3::new(self.x / rhs, self.y / rhs, self.z / rhs)
+        if rhs.abs() <= f64::EPSILON {
+            Vector3::zero()
+        } else {
+            Vector3::new(self.x / rhs, self.y / rhs, self.z / rhs)
+        }
+    }
+}
+
+impl DivAssign<f64> for Vector3 {
+    fn div_assign(&mut self, rhs: f64) {
+        if rhs.abs() > f64::EPSILON {
+            self.x /= rhs;
+            self.y /= rhs;
+            self.z /= rhs;
+        }
     }
 }
 
@@ -194,6 +238,14 @@ impl Matrix3 {
             self.rows[2][0] * p.x + self.rows[2][1] * p.y + self.rows[2][2] * p.z,
         )
     }
+
+    pub fn transform_vector(&self, v: Vector3) -> Vector3 {
+        Vector3::new(
+            self.rows[0][0] * v.x + self.rows[0][1] * v.y + self.rows[0][2] * v.z,
+            self.rows[1][0] * v.x + self.rows[1][1] * v.y + self.rows[1][2] * v.z,
+            self.rows[2][0] * v.x + self.rows[2][1] * v.y + self.rows[2][2] * v.z,
+        )
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -224,9 +276,27 @@ impl Transform3 {
         }
     }
 
+    pub fn rotate_y(angle_rad: f64) -> Self {
+        Self {
+            matrix: Matrix3::rotation_y(angle_rad),
+            translation: Vector3::zero(),
+        }
+    }
+
+    pub fn rotate_z(angle_rad: f64) -> Self {
+        Self {
+            matrix: Matrix3::rotation_z(angle_rad),
+            translation: Vector3::zero(),
+        }
+    }
+
     pub fn transform_point(&self, p: Point3) -> Point3 {
         let rotated = self.matrix.transform_point(p);
         rotated + self.translation
+    }
+
+    pub fn transform_vector(&self, v: Vector3) -> Vector3 {
+        self.matrix.transform_vector(v)
     }
 }
 
@@ -242,6 +312,11 @@ impl Plane {
             origin,
             normal: normal.normalized(),
         }
+    }
+
+    pub fn distance_to_point(&self, p: Point3) -> f64 {
+        let v = p - self.origin;
+        v.dot(self.normal)
     }
 }
 
@@ -264,6 +339,12 @@ impl Box3 {
         let d = self.dimensions();
         d.x * d.y * d.z
     }
+
+    pub fn contains(&self, p: Point3) -> bool {
+        p.x >= self.min.x && p.x <= self.max.x &&
+        p.y >= self.min.y && p.y <= self.max.y &&
+        p.z >= self.min.z && p.z <= self.max.z
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -280,11 +361,34 @@ impl Sphere3 {
     pub fn volume(&self) -> f64 {
         4.0 / 3.0 * std::f64::consts::PI * self.radius.powi(3)
     }
+
+    pub fn contains(&self, p: Point3) -> bool {
+        self.center.distance_to(p) <= self.radius
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Line3 {
+    pub origin: Point3,
+    pub direction: Vector3,
+}
+
+impl Line3 {
+    pub fn new(origin: Point3, direction: Vector3) -> Self {
+        Self {
+            origin,
+            direction: direction.normalized(),
+        }
+    }
+
+    pub fn point_at(&self, t: f64) -> Point3 {
+        self.origin + self.direction * t
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Box3, Matrix3, Plane, Point3, Sphere3, Transform3, Vector3};
+    use super::{Box3, Line3, Matrix3, Plane, Point3, Sphere3, Transform3, Vector3};
 
     #[test]
     fn point_distance_is_euclidean() {
@@ -305,6 +409,13 @@ mod tests {
     }
 
     #[test]
+    fn vector_normalization_is_safe_for_zero() {
+        let v = Vector3::zero();
+        let n = v.normalized();
+        assert_eq!(n, Vector3::zero());
+    }
+
+    #[test]
     fn matrix_rotation_x_keeps_length() {
         let p = Point3::new(0.0, 1.0, 0.0);
         let rotated = Matrix3::rotation_x(std::f64::consts::PI / 2.0).transform_point(p);
@@ -322,22 +433,35 @@ mod tests {
     }
 
     #[test]
-    fn plane_normal_is_normalized() {
+    fn plane_distance_and_normalization_are_stable() {
         let p = Plane::new(Point3::origin(), Vector3::new(3.0, 0.0, 0.0));
         assert!((p.normal.length() - 1.0).abs() < 1e-9);
+        let q = Point3::new(5.0, 2.0, 3.0);
+        assert!((p.distance_to_point(q) - 5.0).abs() < 1e-9);
     }
 
     #[test]
-    fn box_volume_is_correct() {
+    fn box_volume_and_contains_are_correct() {
         let b = Box3::new(Point3::new(0.0, 0.0, 0.0), Point3::new(2.0, 3.0, 4.0));
         assert!((b.volume() - 24.0).abs() < 1e-9);
+        assert!(b.contains(Point3::new(1.0, 1.0, 1.0)));
+        assert!(!b.contains(Point3::new(3.0, 1.0, 1.0)));
     }
 
     #[test]
-    fn sphere_volume_is_correct() {
+    fn sphere_contains_and_volume_are_correct() {
         let s = Sphere3::new(Point3::origin(), 1.0);
         let expected = 4.0 / 3.0 * std::f64::consts::PI;
         assert!((s.volume() - expected).abs() < 1e-6);
+        assert!(s.contains(Point3::new(0.0, 0.0, 0.0)));
+        assert!(!s.contains(Point3::new(2.0, 0.0, 0.0)));
+    }
+
+    #[test]
+    fn line_point_at_is_linear() {
+        let l = Line3::new(Point3::origin(), Vector3::new(1.0, 0.0, 0.0));
+        let p = l.point_at(5.0);
+        assert_eq!(p, Point3::new(5.0, 0.0, 0.0));
     }
 }
 

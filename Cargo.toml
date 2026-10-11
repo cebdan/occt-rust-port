@@ -1,0 +1,12 @@
+[package]
+name = "occt-rust-port"
+version = "0.1.0"
+edition = "2021"
+description = "Autonomous Rust port of Open Cascade Technology (OCCT)"
+license = "MIT"
+
+[lib]
+name = "occt_rust_port"
+path = "src/lib.rs"
+
+[dependencies]

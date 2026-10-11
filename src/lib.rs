@@ -1,7 +1,5 @@
-pub mod core;
-pub mod geom;
-pub mod topo;
+pub mod maths;
+pub mod topology;
 
-pub use core::*;
-pub use geom::*;
-pub use topo::*;
+pub use maths::*;
+pub use topology::*;

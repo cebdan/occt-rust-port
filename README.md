@@ -1,36 +1,27 @@
 # OCCT Rust Port
 
-This repository is an autonomous, test-driven port of selected Open Cascade Technology (OCCT) functionality to Rust.
+This repository is an autonomous, test-driven Rust port of selected OCCT functionality.
 
-The project is intentionally structured in stages:
+## Stage 1: Geometry foundation
 
-1. Geometry primitives (`gp`-style foundation)
-2. Topological objects (`TopoDS`-style foundation)
-3. Building solid primitives
-4. Boolean operations
-5. Mesh and conversion routines
-6. Validation against reference OCCT behavior
+This stage provides the minimum viable geometric core required before moving on to topology and model-building primitives.
 
-## Current status
+Included in the first milestone:
+- `Point3`
+- `Vector3`
+- `Matrix3`
+- `Transform3`
+- `Plane`
+- `Box3`
+- `Sphere3`
+- basic geometric operations and unit tests
 
-This repository currently contains the initial project scaffold and a minimal geometry foundation for future development.
+## Planned next stage
 
-## Goals
-
-- Provide a Rust-native API for the subset of OCCT needed by the target application
-- Preserve functional equivalence where possible
-- Keep behavior verifiable via unit tests
-- Decompose the port into autonomous, incremental milestones
-
-## Architecture
-
-```text
-src/
-  lib.rs
-  core/
-  geom/
-  topo/
-```
+- topology primitives (`Vertex`, `Edge`, `Face`, `Wire`, `Shell`)
+- shape builder API
+- boolean operations
+- validation against OCCT reference behavior
 
 ## Build
 
